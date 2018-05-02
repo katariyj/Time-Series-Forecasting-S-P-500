@@ -1,0 +1,196 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+ 
+Set the working directory and read the data from the respective folder
+```{r}
+
+MSFT_day=read.csv("https://raw.githubusercontent.com/NikhilKorati/Time-Series/master/TestMSFT20051111.csv",header=T)            
+head(MSFT_day)
+tail(sp500daily)
+
+```
+BASIC EDA 
+Head() - This will return the first n observations of the dataset. Default is 6
+Tail() - This will return the last n observations of the dataset. Default is 6
+Summary() - This will return the summary of the statistics like min, median, max, quartiles for each column of the dataset. Count returns missing value if any.
+Dim() - This will return the dimensions of the data frame like the number of rows and number of columns in the dataset. The output is a vector.
+Hist() - This will return a bar plot in which each bar represents the frequency of cases for a range of values
+Str() - returns the classes of each of the columns whether it is numerical or categorical data.
+Names() - This will return the column headers.
+
+BASIC EDA OF MSFT
+
+```{r}
+head(MSFT_day)
+
+tail(MSFT_day)
+
+summary(MSFT_day)
+
+dim(MSFT_day)
+
+hist(MSFT_day$close)
+
+str(MSFT_day)
+
+names(MSFT_day)
+
+plot(MSFT_day$close, type="l", x = MSFT_day$Time, col="blue")
+
+# Advance EDA
+qplot(MSFT_day$close, fill = I("green"), alpha = I(.5), col= I("red"),xlab = "Close",  main="Histogram of MSFT Closing Price", bins = 15)
+
+
+msftminutes = ts(MSFT_day$close, frequency = 48)
+
+autoplot(stl(msftminutes, s.window = "periodic"), ts.colour = "blue")
+
+ggtsdisplay(MSFT_day$close, main= "MSFT Trend, ACF, PACF Plot")
+```
+
+Advance EDA For Minutes Returns for MSFT 
+
+```{r}
+MSFT_price = MSFT_day$close
+MSFTreturns =diff(MSFT_price)/MSFT_price[-length(MSFT_price)]
+
+
+qplot(MSFTreturns, fill = I("blue"), alpha = I(.5), col= I("red"),xlab = "MSFT Returns",  main="Histogram of MSFT Returns", bins = 30)
+
+
+MSFT_returns = ts(MSFTreturns, frequency = 48)
+
+autoplot(stl(MSFT_returns, s.window = 'periodic'), ts.colour = 'blue')
+
+ggtsdisplay(MSFTreturns, main = "MSFT Returns Trend, ACF, PACF Plot")
+
+
+```
+
+
+
+Transformations and EDA - LOG Returns of MSFT
+```{r}
+MSFT_logreturns1=diff(log(MSFT_day$close))
+
+
+qplot(MSFT_logreturns1, fill = I("blue"), alpha = I(.5), col= I("red"),xlab = "MSFT Log Returns",  main="Histogram of MSFT Log Returns", bins = 30)
+
+
+MSFT_logreturns2 = ts(MSFT_logreturns1, frequency = 48)
+
+autoplot(stl(MSFT_logreturns2, s.window = 'periodic'), ts.colour = 'blue')
+
+ggtsdisplay(MSFT_logreturns1, main = "MSFT Log Returns Trend, ACF, PACF Plot")
+```
+
+Compare Histogram of minute returns and Log returns 
+```{r}
+
+require(gridExtra)
+Minute_Returns = qplot(MSFTreturns, fill = I("green"), alpha = I(.5), col= I("red"),xlab = "MSFT Returns",  main="Histogram of MSFT Returns", bins = 10)
+
+Log_Returns=qplot(MSFT_logreturns1, fill = I("blue"), alpha = I(.5), col= I("red"),xlab = "MSFT Log Returns",  main="Histogram of MSFT Log Returns", bins = 10)
+grid.arrange(Minute_Returns, Log_Returns, ncol=2)
+
+```
+
+Check Stats of the data 
+```{r}
+
+ggplot(data.frame(MSFT_logreturns1), aes(sample=MSFT_logreturns1))+stat_qq()
+
+t.test(MSFT_logreturns1)
+
+library(fBasics) ## This loads the package fBasic
+basicStats(MSFTreturns)
+basicStats(MSFT_logreturns1)
+
+ggplot(data.frame(MSFTreturns), aes(sample=MSFTreturns))+stat_qq()
+t.test(MSFTreturns)
+
+## Normality tests
+
+normalTest(MSFTreturns,method="jb")
+
+autoplot(acf(MSFTreturns,lag=15, plot = FALSE))
+
+#Independence test
+Box.test(MSFTreturns,lag=10)
+
+Box.test(MSFTreturns,lag=10,type="Ljung")
+```
+
+Model Building
+
+```{r}
+model1=ar(MSFTreturns,method='mle')
+model1
+model1_residuals = model1$resid[!is.na(model1$resid)]
+
+ggtsdisplay(model1_residuals, main = "Model 1 residuals Trend, ACF, PACF Plot")
+
+#p value is greater than alpha so residuals are independent
+Box.test(model1_residuals,lag=10,type='Ljung') 
+
+```
+Other models
+```{r}
+model2=arima(MSFTreturns,order=c(4,0,3))
+model2
+
+ggtsdisplay(model2$residuals, main = "Model 2 residuals Trend, ACF, PACF Plot")
+
+#p value greater than alpha so the residuals are independent
+Box.test(model2$residuals,lag=10,type='Ljung') 
+
+
+model3=arima(MSFTreturns,order=c(3,0,4))
+model3
+
+ggtsdisplay(model3$residuals, main = "Model 3 residuals Trend, ACF, PACF Plot")
+
+#p value greater than alpha so the residuals are independent
+Box.test(model3$residuals,lag=10,type='Ljung') 
+
+
+#p value greater than alpha so the residuals are independent
+model4=arima(MSFTreturns,order=c(3,0,3))
+model4
+
+ggtsdisplay(model4$residuals, main = "Model 4 residuals Trend, ACF, PACF Plot")
+
+Box.test(model4$residuals,lag=10,type='Ljung') 
+
+
+model5=arima(MSFTreturns,order=c(6,0,6))
+model5
+
+ggtsdisplay(model5$residuals, main = "Model 2 residuals Trend, ACF, PACF Plot")
+
+Box.test(model5$residuals,lag=10,type='Ljung') 
+```
+
+We select Model 4
+```{r}
+
+ggtsdiag(model4)
+
+```
+
+
+
+```{r}
+poly1=c(1,-model4$coef[1:3])
+roots=polyroot(poly1)
+roots
+
+Mod(roots)
+```
+
+```{r}
+prediction = predict(model4, 10)
+prediction
+```
